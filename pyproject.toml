@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "arifos-geox"
-version = "0.1.0"
-description = "GEOX — Governed, agentic geological intelligence coprocessor for arifOS"
+version = "0.2.0"
+description = "GEOX — Geospatial world-model co-agent for arifOS W@W federated architecture. DITEMPA BUKAN DIBERI."
 readme = "README.md"
 license = {text = "AGPL-3.0"}
 authors = [
@@ -23,6 +23,11 @@ keywords = [
     "constitutional-ai",
     "hydrocarbon",
     "prospect-evaluation",
+    "world-model",
+    "geospatial",
+    "w@w",
+    "federated-agent",
+    "asean",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -53,6 +58,9 @@ dependencies = [
 qdrant = [
     "qdrant-client>=1.7",
 ]
+macrostrat = [
+    "httpx>=0.24",
+]
 dev = [
     "pytest>=7.4",
     "pytest-asyncio>=0.23",
@@ -68,13 +76,16 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/arifos/geox"
-Documentation = "https://huggingface.co/datasets/arifos/geox"
-"Bug Tracker" = "https://github.com/arifos/geox/issues"
-"HuggingFace Hub" = "https://huggingface.co/datasets/arifos/geox"
+Homepage = "https://github.com/ariffazil/GEOX"
+Documentation = "https://github.com/ariffazil/GEOX/blob/main/docs/GEOX_AGENT_SPEC_v2.md"
+"Bug Tracker" = "https://github.com/ariffazil/GEOX/issues"
+"Security" = "https://github.com/ariffazil/GEOX/security"
+"HuggingFace Dataset" = "https://huggingface.co/datasets/ariffazil/AAA"
+"arifOS" = "https://github.com/ariffazil/arifOS"
+Changelog = "https://github.com/ariffazil/GEOX/blob/main/CHANGELOG.md"
 
 [project.scripts]
-geox = "arifos.geox.cli:main"
+# geox = "arifos.geox.cli:main"  # TODO: implement in v0.3.0
 
 [tool.hatch.build.targets.wheel]
 packages = ["arifos"]
