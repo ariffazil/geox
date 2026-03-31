@@ -161,6 +161,68 @@ class ProvenanceRecord(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# ContrastMetadata (Contrast Canon)
+# ---------------------------------------------------------------------------
+
+class ContrastMetadata(BaseModel):
+    """
+    Contrast Canon metadata for seismic attributes.
+    
+    Enforces F4 (Clarity) by explicitly separating:
+    - Physical axes: What geological signal the attribute measures
+    - Visual encoding: How it's displayed (colormap, dynamic range)
+    - Anomalous risk: Potential for display-induced misinterpretation
+    
+    Prevents the "anomalous risk" where perceptual contrast from
+    visualization choices is mistaken for physical geological signal.
+    """
+    
+    attribute_name: str = Field(
+        ...,
+        description="Attribute identifier (e.g. coherence_semblance, curvature_max)",
+    )
+    physical_axes: list[str] = Field(
+        ...,
+        description="Physical geological quantities measured (impedance, waveform_similarity, flexure)",
+    )
+    processing_steps: list[str] = Field(
+        default_factory=list,
+        description="Processing chain: dip_steered, semblance_3x3x3, etc.",
+    )
+    visual_encoding: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "colormap": "gray_inverted",
+            "dynamic_range": "p2-p98",
+            "gamma": 1.0,
+        },
+        description="Display parameters affecting perceptual contrast",
+    )
+    anomalous_risk: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "display_bias": "medium",
+            "risk_level": "moderate",
+            "notes": "",
+            "mitigation": [],
+        },
+        description="Risk assessment for display-induced misinterpretation",
+    )
+    equation_reference: str | None = Field(
+        default=None,
+        description="Literature source (Marfurt et al. 1998, Chopra & Marfurt 2007)",
+    )
+    uncertainty_factors: list[str] = Field(
+        default_factory=list,
+        description="Explicit uncertainty sources",
+    )
+    is_meta_attribute: bool = Field(
+        default=False,
+        description="True if ML-derived (requires higher scrutiny per F9)",
+    )
+
+    model_config = {"json_schema_extra": {"title": "ContrastMetadata"}}
+
+
+# ---------------------------------------------------------------------------
 # GeoQuantity
 # ---------------------------------------------------------------------------
 
@@ -432,6 +494,113 @@ class GeoInsight(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# AttributeStack (Contrast Canon Extension)
+# ---------------------------------------------------------------------------
+
+class AttributeVolume(BaseModel):
+    """
+    A single computed seismic attribute volume with full governance metadata.
+    """
+    name: str = Field(..., description="Attribute identifier")
+    data_ref: str = Field(..., description="Path or reference to volume data")
+    contrast: ContrastMetadata = Field(..., description="Contrast Canon metadata")
+    uncertainty: float = Field(
+        ...,
+        ge=0.03,
+        le=0.15,
+        description="F7 Humility: fractional uncertainty [0.03, 0.15]",
+    )
+    ground_truthing: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Well ties, horizon picks, or other validation data",
+    )
+
+    model_config = {"json_schema_extra": {"title": "AttributeVolume"}}
+
+
+class AttributeStack(BaseModel):
+    """
+    Governed multi-attribute volume for Subsurface Forge.
+    
+    Enforces Contrast Canon on all attributes, separating physical
+    signal from perceptual display artifacts.
+    
+    Constitutional Floors:
+      F1: Full provenance chain for reversibility
+      F4: Clarity through explicit physical_axes vs visual_encoding
+      F7: Uncertainty bounds on all attributes
+      F9: Anti-Hantu through anomalous_risk assessment
+      F13: Human sign-off for high-risk meta-attributes
+    """
+    
+    stack_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        description="Unique identifier for this attribute stack",
+    )
+    volume_ref: str = Field(
+        ...,
+        description="Grounded reference to input seismic volume",
+    )
+    attributes: dict[str, AttributeVolume] = Field(
+        ...,
+        description="Named attribute volumes with full metadata",
+    )
+    provenance: ProvenanceRecord = Field(
+        ...,
+        description="Full audit trail for the stack computation",
+    )
+    aggregate_uncertainty: float = Field(
+        ...,
+        ge=0.03,
+        le=0.15,
+        description="Stack-wide uncertainty estimate (F7 Humility)",
+    )
+    verdict: Literal["SEAL", "QUALIFY", "HOLD", "GEOX_BLOCK"] = Field(
+        default="QUALIFY",
+        description=(
+            "SEAL = all attributes grounded and validated; "
+            "QUALIFY = proceed with standard QC; "
+            "HOLD = elevated risk, requires review; "
+            "GEOX_BLOCK = ungrounded meta-attributes, cannot proceed"
+        ),
+    )
+    verdict_explanation: str = Field(
+        default="",
+        description="Human-readable explanation of verdict",
+    )
+    has_meta_attributes: bool = Field(
+        default=False,
+        description="True if any ML-derived attributes present",
+    )
+    well_ties: list[str] = Field(
+        default_factory=list,
+        description="Well names used for ground truthing",
+    )
+    telemetry: dict[str, Any] = Field(
+        default_factory=dict,
+        description="arifOS telemetry block",
+    )
+
+    @model_validator(mode="after")
+    def validate_meta_attribute_grounding(self) -> AttributeStack:
+        """
+        F9 Anti-Hantu: Meta-attributes without well ties are suspect.
+        If has_meta_attributes is True but well_ties is empty, downgrade verdict.
+        """
+        if self.has_meta_attributes and not self.well_ties:
+            if self.verdict not in ["HOLD", "GEOX_BLOCK"]:
+                self.verdict = "HOLD"
+                self.verdict_explanation = (
+                    "Meta-attribute(s) present without well tie validation. "
+                    "Perceptual contrast risk elevated. "
+                    "Provide well_ties to upgrade to QUALIFY."
+                )
+        return self
+
+    model_config = {"json_schema_extra": {"title": "AttributeStack"}}
+
+
+# ---------------------------------------------------------------------------
 # GeoRequest
 # ---------------------------------------------------------------------------
 
@@ -637,9 +806,12 @@ def export_json_schemas() -> dict[str, dict]:
         dict[str, dict]: {
             "CoordinatePoint": {...},
             "ProvenanceRecord": {...},
+            "ContrastMetadata": {...},
             "GeoQuantity": {...},
             "GeoPrediction": {...},
             "GeoInsight": {...},
+            "AttributeVolume": {...},
+            "AttributeStack": {...},
             "GeoRequest": {...},
             "GeoResponse": {...},
         }
@@ -647,9 +819,12 @@ def export_json_schemas() -> dict[str, dict]:
     models = [
         CoordinatePoint,
         ProvenanceRecord,
+        ContrastMetadata,
         GeoQuantity,
         GeoPrediction,
         GeoInsight,
+        AttributeVolume,
+        AttributeStack,
         GeoRequest,
         GeoResponse,
     ]

@@ -11,7 +11,8 @@ Tool hierarchy:
     ├─ EOFoundationModelTool — Earth Observation foundation model
     ├─ SeismicVLMTool      — Vision Language Model for seismic
     ├─ SimulatorTool       — Basin/PVT simulator
-    └─ GeoRAGTool          — Geological RAG over literature
+    ├─ GeoRAGTool          — Geological RAG over literature
+    └─ SeismicAttributesTool — Seismic attribute computation with Contrast Canon
 
 ToolRegistry — central registry for tool discovery and injection.
 
@@ -37,6 +38,9 @@ from arifos.geox.geox_schemas import (
     CoordinatePoint,
     GeoQuantity,
     ProvenanceRecord,
+    ContrastMetadata,
+    AttributeVolume,
+    AttributeStack,
 )
 from arifos.geox.base_tool import (
     BaseTool,
@@ -46,6 +50,7 @@ from arifos.geox.base_tool import (
 )
 from arifos.geox.tools.macrostrat_tool import MacrostratTool
 from arifos.geox.tools.lem_bridge import LEMBridgeTool
+from arifos.geox.tools.seismic_visual_filter import SeismicVisualFilterTool
 
 
 
@@ -670,6 +675,393 @@ class GeoRAGTool(BaseTool):
 
 
 # ---------------------------------------------------------------------------
+# SeismicAttributesTool — Contrast Canon Implementation
+# ---------------------------------------------------------------------------
+
+class SeismicAttributesTool(BaseTool):
+    """
+    Seismic attribute computation with Contrast Canon enforcement.
+    
+    Computes classical attributes (coherence, curvature, spectral decomposition)
+    and manages meta-attributes (AI fault probability, etc.) with full
+    governance metadata.
+    
+    Constitutional Floors Enforced:
+      F1  Amanah — Full provenance chain for every attribute
+      F4  Clarity — Physical axes vs visual encoding explicitly separated
+      F7  Humility — Uncertainty bounds on all outputs
+      F9  Anti-Hantu — Meta-attributes flagged without well ties
+      F13 Sovereign — Human sign-off for high-risk ungrounded attributes
+    
+    Inputs:
+        volume_ref      (str) — Reference to input seismic volume
+        attribute_list  (list[str]) — Attributes to compute
+        config          (dict) — Processing parameters
+        well_ties       (list[str]|None) — Wells for ground truthing
+    
+    Outputs:
+        AttributeStack with full ContrastMetadata per attribute
+    """
+
+    @property
+    def name(self) -> str:
+        return "SeismicAttributesTool"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Computes seismic attributes (coherence, curvature, spectral, meta) "
+            "with full Contrast Canon metadata. Enforces F7/F9 on meta-attributes."
+        )
+
+    def validate_inputs(self, inputs: dict[str, Any]) -> bool:
+        required = {"volume_ref", "attribute_list"}
+        return required.issubset(inputs.keys())
+
+    def _is_meta_attribute(self, attr_name: str) -> bool:
+        """Check if attribute is ML-derived meta-attribute."""
+        meta_indicators = ["meta", "fault_prob", "ai_", "ml_", "learned"]
+        return any(ind in attr_name.lower() for ind in meta_indicators)
+
+    def _get_physical_axes(self, attr_name: str) -> list[str]:
+        """Map attribute to physical geological axes."""
+        mapping = {
+            "coherence": ["waveform_similarity", "discontinuity"],
+            "semblance": ["waveform_similarity", "lateral_continuity"],
+            "curvature": ["structural_flexure", "strain"],
+            "curvature_max": ["flexure", "strain", "bending"],
+            "curvature_min": ["flexure", "strain", "bending"],
+            "spectral": ["frequency_content", "tuning_thickness"],
+            "rms": ["reflectivity_energy", "acoustic_impedance_contrast"],
+            "meta_fault_prob": ["discontinuity", "learned_nonlinear"],
+            "ai_fault": ["discontinuity", "learned_pattern"],
+        }
+        return mapping.get(attr_name.lower(), ["unknown_physical_axis"])
+
+    def _get_equation_ref(self, attr_name: str) -> str | None:
+        """Get literature reference for attribute formula."""
+        refs = {
+            "coherence": "Marfurt et al. (1998) — semblance-based coherence",
+            "semblance": "Marfurt et al. (1998)",
+            "curvature": "Chopra & Marfurt (2007) — volumetric curvature",
+            "curvature_max": "Chopra & Marfurt (2007)",
+            "curvature_min": "Chopra & Marfurt (2007)",
+            "spectral": "Partyka et al. (1999) — spectral decomposition",
+            "rms": "Standard RMS amplitude",
+        }
+        return refs.get(attr_name.lower())
+
+    def _compute_coherence(self, seed: int) -> dict[str, Any]:
+        """Mock coherence computation."""
+        rng = random.Random(seed)
+        return {
+            "type": "2d_array",
+            "shape": [200, 200],
+            "data_stats": {
+                "min": rng.uniform(0.0, 0.1),
+                "max": rng.uniform(0.9, 1.0),
+                "mean": rng.uniform(0.6, 0.8),
+            }
+        }
+
+    def _compute_curvature(self, seed: int, variant: str = "max") -> dict[str, Any]:
+        """Mock curvature computation."""
+        rng = random.Random(seed + 1)
+        return {
+            "type": "2d_array",
+            "shape": [200, 200],
+            "variant": variant,
+            "data_stats": {
+                "min": rng.uniform(-0.05, -0.01),
+                "max": rng.uniform(0.01, 0.05),
+                "mean": rng.uniform(-0.001, 0.001),
+            }
+        }
+
+    def _compute_spectral(self, seed: int, freq_band: tuple = (15, 45)) -> dict[str, Any]:
+        """Mock spectral decomposition."""
+        rng = random.Random(seed + 2)
+        return {
+            "type": "2d_array",
+            "shape": [200, 200],
+            "freq_band_hz": list(freq_band),
+            "data_stats": {
+                "min": rng.uniform(0.0, 500.0),
+                "max": rng.uniform(5000.0, 15000.0),
+                "mean": rng.uniform(2000.0, 4000.0),
+            }
+        }
+
+    def _compute_meta_fault_prob(self, seed: int) -> dict[str, Any]:
+        """Mock AI fault probability (meta-attribute)."""
+        rng = random.Random(seed + 3)
+        return {
+            "type": "2d_array",
+            "shape": [200, 200],
+            "model": "CNN_FaultSeg_v1",
+            "data_stats": {
+                "min": rng.uniform(0.0, 0.1),
+                "max": rng.uniform(0.7, 1.0),
+                "mean": rng.uniform(0.2, 0.4),
+            }
+        }
+
+    async def run(self, inputs: dict[str, Any]) -> GeoToolResult:
+        """Execute attribute computation with full Contrast Canon."""
+        if not self.validate_inputs(inputs):
+            return GeoToolResult(
+                tool_name=self.name,
+                success=False,
+                error="Invalid inputs: required keys are 'volume_ref', 'attribute_list'.",
+            )
+
+        start = time.perf_counter()
+        volume_ref: str = inputs["volume_ref"]
+        attribute_list: list[str] = inputs["attribute_list"]
+        config: dict = inputs.get("config", {})
+        well_ties: list[str] | None = inputs.get("well_ties")
+
+        # Deterministic seed from volume_ref
+        seed = int(hashlib.sha256(volume_ref.encode()).hexdigest(), 16) % (2**31)
+        
+        # Compute attributes
+        attributes: dict[str, AttributeVolume] = {}
+        has_meta = False
+        max_uncertainty = 0.08  # Classical attributes start lower
+
+        for attr_name in attribute_list:
+            is_meta = self._is_meta_attribute(attr_name)
+            if is_meta:
+                has_meta = True
+                # F7: Meta-attributes have higher uncertainty floor
+                uncertainty = 0.12
+                max_uncertainty = max(max_uncertainty, uncertainty)
+            else:
+                uncertainty = 0.08
+
+            # Compute based on attribute type
+            if "coherence" in attr_name.lower() or "semblance" in attr_name.lower():
+                data = self._compute_coherence(seed)
+            elif "curvature" in attr_name.lower():
+                variant = "max" if "max" in attr_name.lower() else "min"
+                data = self._compute_curvature(seed, variant)
+            elif "spectral" in attr_name.lower():
+                freq = config.get("freq_band", (15, 45))
+                data = self._compute_spectral(seed, freq)
+            elif is_meta:
+                data = self._compute_meta_fault_prob(seed)
+            else:
+                # Generic fallback
+                data = {"type": "unknown", "note": f"No implementation for {attr_name}"}
+
+            # Build ContrastMetadata
+            anomalous_risk = self._generate_anomalous_risk(attr_name, is_meta, well_ties)
+            
+            contrast = ContrastMetadata(
+                attribute_name=attr_name,
+                physical_axes=self._get_physical_axes(attr_name),
+                processing_steps=self._get_processing_steps(attr_name, config),
+                visual_encoding=config.get("visual_encoding", {
+                    "colormap": "gray_inverted",
+                    "dynamic_range": "p2-p98",
+                    "gamma": 1.0,
+                }),
+                anomalous_risk=anomalous_risk,
+                equation_reference=self._get_equation_ref(attr_name),
+                uncertainty_factors=self._get_uncertainty_factors(attr_name, is_meta),
+                is_meta_attribute=is_meta,
+            )
+
+            # Build AttributeVolume
+            attr_vol = AttributeVolume(
+                name=attr_name,
+                data_ref=f"mem://{volume_ref}/{attr_name}",
+                contrast=contrast,
+                uncertainty=uncertainty,
+                ground_truthing={"wells": well_ties or []},
+            )
+            
+            attributes[attr_name] = attr_vol
+
+        # Determine verdict
+        verdict, verdict_explanation = self._determine_verdict(
+            attributes, has_meta, well_ties
+        )
+
+        # Build AttributeStack
+        stack = AttributeStack(
+            volume_ref=volume_ref,
+            attributes=attributes,
+            provenance=_make_provenance(
+                f"ATTR-{seed}", "LEM", confidence=0.82
+            ),
+            aggregate_uncertainty=max_uncertainty,
+            verdict=verdict,  # type: ignore
+            verdict_explanation=verdict_explanation,
+            has_meta_attributes=has_meta,
+            well_ties=well_ties or [],
+            telemetry={
+                "agent": "@GEOX",
+                "tool": "SeismicAttributesTool",
+                "version": "0.3.0-contrast-canon",
+                "pipeline": "222_REFLECT",
+                "floors": ["F1", "F4", "F7", "F9"],
+                "seal": "DITEMPA BUKAN DIBERI",
+            },
+        )
+
+        # Build GeoToolResult
+        latency_ms = (time.perf_counter() - start) * 1000
+        
+        # Create a quantity for the stack itself
+        location = CoordinatePoint(latitude=4.5, longitude=103.7)
+        source_id = f"ATTR-STACK-{seed}"
+        prov = _make_provenance(source_id, "LEM", confidence=0.82)
+        stack_quantity = _make_quantity(
+            len(attributes), "count", "attribute_count", location, prov, max_uncertainty
+        )
+
+        return GeoToolResult(
+            quantities=[stack_quantity],
+            raw_output={
+                "stack": stack.model_dump(),
+                "volume_ref": volume_ref,
+                "attribute_count": len(attributes),
+            },
+            metadata={
+                "stack_id": stack.stack_id,
+                "verdict": verdict,
+                "has_meta_attributes": has_meta,
+                "well_ties": well_ties,
+            },
+            tool_name=self.name,
+            latency_ms=round(latency_ms, 2),
+            success=True,
+        )
+
+    def _generate_anomalous_risk(
+        self, name: str, is_meta: bool, well_ties: list[str] | None
+    ) -> dict[str, Any]:
+        """Generate anomalous risk assessment."""
+        if is_meta:
+            return {
+                "display_bias": "high",
+                "risk_level": "critical",
+                "notes": (
+                    "AI-derived meta-attribute. Perceptual contrast may dominate "
+                    "physical signal. Physical traceability is partial. "
+                    f"Well ties: {len(well_ties) if well_ties else 0} provided. "
+                    "Mandatory: cross-validate with classical attributes + horizon flattening."
+                ),
+                "mitigation": [
+                    "Cross-validate with classical attributes",
+                    "Require well tie verification",
+                    "Check for acquisition footprint",
+                    "Validate against known geology",
+                ]
+            }
+        
+        # Classical attributes
+        return {
+            "display_bias": "low",
+            "risk_level": "minimal",
+            "notes": f"Classical attribute: {name}. High physical traceability.",
+            "mitigation": ["Standard QC: check for edge artifacts"],
+        }
+
+    def _get_processing_steps(self, attr_name: str, config: dict) -> list[str]:
+        """Get processing chain for attribute."""
+        steps = []
+        
+        if config.get("dip_steered"):
+            steps.append("dip_steered")
+        
+        if "coherence" in attr_name.lower():
+            window = config.get("coherence_window", "3x3x3")
+            steps.append(f"semblance_{window}")
+        elif "curvature" in attr_name.lower():
+            steps.append("structural_smoothing")
+            steps.append("second_derivative")
+        elif "spectral" in attr_name.lower():
+            method = config.get("spectral_method", "STFT")
+            steps.append(f"spectral_decomp_{method}")
+        elif self._is_meta_attribute(attr_name):
+            steps.append("cnn_inference")
+            steps.append("fusion_postprocess")
+        
+        return steps
+
+    def _get_uncertainty_factors(self, name: str, is_meta: bool) -> list[str]:
+        """Get uncertainty sources for attribute."""
+        factors = [
+            "acquisition_footprint",
+            "processing_noise",
+            "velocity_model_uncertainty",
+        ]
+        
+        if "coherence" in name.lower():
+            factors.extend(["spatial_window_size", "dip_estimation_error"])
+        elif "curvature" in name.lower():
+            factors.extend(["derivative_estimation_noise", "structural_complexity"])
+        elif is_meta:
+            factors.extend([
+                "training_data_bias",
+                "generalization_gap",
+                "fusion_artifact_amplification",
+                "perceptual_conflation_risk",
+            ])
+        
+        return factors
+
+    def _determine_verdict(
+        self,
+        attributes: dict[str, AttributeVolume],
+        has_meta: bool,
+        well_ties: list[str] | None,
+    ) -> tuple[str, str]:
+        """
+        Determine constitutional verdict for attribute stack.
+        
+        Returns:
+            (verdict, explanation)
+        """
+        # F9 Anti-Hantu: Meta-attributes without well ties are suspect
+        if has_meta and not well_ties:
+            return (
+                "GEOX_BLOCK",
+                (
+                    "Meta-attribute(s) present without well tie validation. "
+                    "Perceptual contrast may dominate physical signal (F9). "
+                    "Provide well_ties to upgrade to QUALIFY."
+                ),
+            )
+        
+        # Check for any HOLD conditions
+        ungrounded_meta = [
+            name for name, vol in attributes.items()
+            if vol.contrast.is_meta_attribute and not well_ties
+        ]
+        
+        if ungrounded_meta:
+            return (
+                "HOLD",
+                f"Meta-attributes {ungrounded_meta} lack well tie validation. Review required.",
+            )
+        
+        # All clear
+        if has_meta and well_ties:
+            return (
+                "QUALIFY",
+                f"Meta-attributes present but grounded with {len(well_ties)} well ties. Proceed with QC.",
+            )
+        
+        return (
+            "SEAL",
+            "All classical attributes properly grounded. Standard QC applies.",
+        )
+
+
+# ---------------------------------------------------------------------------
 # ToolRegistry
 # ---------------------------------------------------------------------------
 
@@ -732,11 +1124,10 @@ class ToolRegistry:
     def default_registry(cls) -> "ToolRegistry":
         """
         Factory method that creates a ToolRegistry pre-populated
-        with all five standard GEOX tools.
+        with all standard GEOX tools.
 
         Returns:
-            ToolRegistry with EarthModelTool, EOFoundationModelTool,
-            SeismicVLMTool, SimulatorTool, and GeoRAGTool registered.
+            ToolRegistry with all tools registered.
         """
         registry = cls()
         registry.register(EarthModelTool())
@@ -746,4 +1137,6 @@ class ToolRegistry:
         registry.register(GeoRAGTool())
         registry.register(MacrostratTool())
         registry.register(LEMBridgeTool())
+        registry.register(SeismicVisualFilterTool())
+        registry.register(SeismicAttributesTool())
         return registry
