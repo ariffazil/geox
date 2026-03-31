@@ -138,7 +138,7 @@ async def interpret_single_line(
         is_raster=is_raster,
         setting=ranked_models.models[0].tectonic_setting if ranked_models.models else None,
         confidence=ranked_models.models[0].setting_confidence if ranked_models.models else 0.0,
-        n_alternatives=len(ranked_models.alternative_models),
+        n_alternatives=len(ranked_models.models) - 1,
     )
 
     validation_recommendations = _build_validation_recommendations(
@@ -147,7 +147,7 @@ async def interpret_single_line(
         source_type=source_type,
     )
 
-    pipeline_latency_ms = (time.perfyncio() - pipeline_start) * 1000
+    pipeline_latency_ms = (time.perf_counter() - pipeline_start) * 1000
 
     prov = _make_provenance(
         f"INTERPRET-{hashlib.sha256(image_ref.encode()).hexdigest()[:8]}",
@@ -155,7 +155,7 @@ async def interpret_single_line(
         confidence=ranked_models.aggregate_uncertainty,
     )
 
-    best_model = ranked_models.models[0] if ranked_models.models else None
+    best_model = ranked_models.models[0]
 
     if best_model:
         final_verdict = Line2DVerdict.HOLD if is_raster else Line2DVerdict.QUALIFY
@@ -182,7 +182,7 @@ async def interpret_single_line(
     return GEOXInterpretationResult(
         image_ref=image_ref,
         best_model=best_model,
-        alternative_models=ranked_models.alternative_models,
+        alternative_models=ranked_models.models[1:],
         validation_recommendations=validation_recommendations,
         bias_audit=bias_audit,
         bond_2007_reference=BOND_REFERENCE,

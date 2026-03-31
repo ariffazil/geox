@@ -205,7 +205,7 @@ class GEOXContrastViewSet(BaseModel):
 
     image_ref: str
     views: list[GEOXSeismicView] = Field(
-        ..., min_length=1, max_length=8, description="1-8 canonical views"
+        ..., min_length=1, max_length=12, description="1-12 canonical views"
     )
     canonical_view_ref: str = Field(..., description="Reference to the primary canonical view")
     provenance: ProvenanceRecord
