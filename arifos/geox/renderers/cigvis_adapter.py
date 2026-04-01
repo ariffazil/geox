@@ -26,14 +26,14 @@ from __future__ import annotations
 
 import logging
 import socket
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from arifos.geox.renderers.base import (
-    RenderMode,
+    RendererAdapter,
     RenderResult,
     RenderSession,
-    RendererAdapter,
 )
 
 logger = logging.getLogger("geox.renderers.cigvis")
@@ -42,12 +42,10 @@ CIGVIS_AVAILABLE = True
 try:
     import cigvis
     import numpy as np
-    import viser
 except ImportError:
     CIGVIS_AVAILABLE = False
     cigvis = None
     np = None
-    viser = None
 
 
 class CigvisAdapter(RendererAdapter):
@@ -106,31 +104,34 @@ class CigvisAdapter(RendererAdapter):
         nodes = []
 
         for volume_slice in scene.volume_slices:
-            node = self._volume_slice_to_node(volume_slice)
-            if node is not None:
-                nodes.append(node)
+            slice_nodes = self._volume_slice_to_node(volume_slice)
+            nodes.extend(slice_nodes)
 
         for surface in scene.surfaces:
-            node = self._surface_to_node(surface)
-            if node is not None:
-                nodes.append(node)
+            surface_nodes = self._surface_to_node(surface)
+            if surface_nodes:
+                nodes.extend(surface_nodes)
 
         for fault in scene.faults:
-            node = self._fault_to_node(fault)
-            if node is not None:
-                nodes.append(node)
+            fault_nodes = self._fault_to_node(fault)
+            if fault_nodes:
+                nodes.extend(fault_nodes)
 
         for well in scene.wells:
-            node = self._well_to_node(well)
-            if node is not None:
-                nodes.append(node)
+            well_nodes = self._well_to_node(well)
+            if well_nodes:
+                nodes.extend(well_nodes)
 
         return nodes
 
-    def _volume_slice_to_node(self, volume_slice: Any) -> Any | None:
-        """Convert volume slice primitive to cigvis node."""
+    def _volume_slice_to_node(self, volume_slice: Any) -> list[Any]:
+        """Convert volume slice primitive to cigvis nodes.
+
+        Returns a list because cigvis.create_slices returns
+        [AxisAlignedImage, InteractiveLine, ...] nodes.
+        """
         if not CIGVIS_AVAILABLE or volume_slice.data is None:
-            return None
+            return []
 
         try:
             data = volume_slice.data
@@ -139,70 +140,124 @@ class CigvisAdapter(RendererAdapter):
             elif not isinstance(data, np.ndarray):
                 data = np.array(data)
 
-            return cigvis.SeismicSlice(
+            direction = volume_slice.direction
+            pos = {"x": [], "y": [], "z": []}
+            if direction.value == "inline":
+                pos["x"] = [volume_slice.slice_value]
+            elif direction.value == "crossline":
+                pos["y"] = [volume_slice.slice_value]
+            elif direction.value in ("timeslice", "depth_slice"):
+                pos["z"] = [volume_slice.slice_value]
+
+            clim = list(volume_slice.clim) if volume_slice.clim else None
+            cmap = volume_slice.cmap if volume_slice.cmap else "Petrel"
+
+            nodes = cigvis.create_slices(
                 data,
-                slice_type=volume_slice.direction.value,
-                value=volume_slice.slice_value,
-                cmap=volume_slice.cmap,
-                clim=volume_slice.clim,
+                pos=pos,
+                clim=clim,
+                cmap=cmap,
+                intersection_lines=False,
             )
+            return nodes
         except Exception as e:
             logger.warning(f"Failed to create volume slice node: {e}")
-            return None
+            return []
 
-    def _surface_to_node(self, surface: Any) -> Any | None:
-        """Convert surface primitive to cigvis node."""
+    def _surface_to_node(self, surface: Any) -> list[Any]:
+        """Convert surface primitive to cigvis nodes."""
         if not CIGVIS_AVAILABLE:
-            return None
+            return []
 
         try:
-            vertices = np.array([[v.x, v.y, v.z] for v in surface.vertices])
-            if surface.triangles:
-                triangles = np.array(surface.triangles)
-                return cigvis.Mesh(
-                    vertices,
-                    triangles,
-                    color=surface.color.to_hex(),
-                    opacity=surface.opacity,
-                )
+            if not surface.vertices:
+                return []
+
+            vertices = np.array([[v.x, v.y, v.z] for v in surface.vertices], dtype=np.float32)
+
+            if len(vertices) == 0:
+                return []
+
+            if len(vertices) == 2:
+                import math
+
+                n1 = int(math.sqrt(len(vertices)))
+                n2 = n1
             else:
-                return cigvis.Points(vertices, color=surface.color.to_hex())
+                n1 = int(math.sqrt(len(vertices)))
+                n2 = len(vertices) // n1 if n1 > 0 else 1
+                if n1 * n2 < len(vertices):
+                    n2 += 1
+
+            nodes = cigvis.create_surfaces(
+                [vertices],
+                shape=(n1, n2),
+                value_type="depth",
+                cmap=surface.color.to_hex(),
+                shading="smooth",
+            )
+            return nodes
         except Exception as e:
             logger.warning(f"Failed to create surface node: {e}")
-            return None
+            return []
 
-    def _fault_to_node(self, fault: Any) -> Any | None:
-        """Convert fault primitive to cigvis node."""
+    def _fault_to_node(self, fault: Any) -> list[Any]:
+        """Convert fault primitive to cigvis nodes."""
         if not CIGVIS_AVAILABLE:
-            return None
+            return []
 
         try:
+            points_list = []
             if fault.trace_points:
-                points = np.array([[p.x, p.y, p.z] for p in fault.trace_points])
-                return cigvis.Points(points, color=fault.color.to_hex(), point_size=5)
+                points_list = [[p.x, p.y, p.z] for p in fault.trace_points]
             elif fault.vertices:
-                vertices = np.array([[v.x, v.y, v.z] for v in fault.vertices])
-                return cigvis.Lines(vertices, color=fault.color.to_hex())
-            return None
+                points_list = [[v.x, v.y, v.z] for v in fault.vertices]
+
+            if not points_list:
+                return []
+
+            points = np.array(points_list, dtype=np.float32)
+
+            nodes = cigvis.create_points(
+                points,
+                r=2,
+                color=fault.color.to_hex(),
+            )
+            return nodes if isinstance(nodes, list) else [nodes]
         except Exception as e:
             logger.warning(f"Failed to create fault node: {e}")
-            return None
+            return []
 
-    def _well_to_node(self, well: Any) -> Any | None:
-        """Convert well trajectory primitive to cigvis node."""
+    def _well_to_node(self, well: Any) -> list[Any]:
+        """Convert well trajectory primitive to cigvis nodes."""
         if not CIGVIS_AVAILABLE:
-            return None
+            return []
 
         try:
-            trajectory = np.array([[p.x, p.y, p.z] for p in well.trajectory])
-            return cigvis.WellTrajectory(
-                trajectory,
-                name=well.name,
-                color=well.color.to_hex(),
+            if not well.trajectory:
+                return []
+
+            points = np.array([[p.x, p.y, p.z] for p in well.trajectory], dtype=np.float32)
+
+            if len(points) == 0:
+                return []
+
+            values = None
+            if well.md_values and len(well.md_values) == len(points):
+                md_arr = np.array(well.md_values, dtype=np.float32).reshape(-1, 1)
+                values = md_arr
+
+            nodes = cigvis.vispyplot.create_well_logs(
+                points,
+                values=values,
+                cmap=well.color.to_hex(),
+                cyclinder=True,
+                radius_tube=1.5,
             )
+            return nodes if isinstance(nodes, list) else [nodes]
         except Exception as e:
             logger.warning(f"Failed to create well node: {e}")
-            return None
+            return []
 
     def render_snapshot(
         self,
@@ -230,8 +285,7 @@ class CigvisAdapter(RendererAdapter):
             )
 
         try:
-            import tempfile
-            from PIL import Image
+            from datetime import datetime
 
             nodes = scene.get("nodes", [])
 
@@ -241,22 +295,23 @@ class CigvisAdapter(RendererAdapter):
                     errors=["No renderable nodes in scene"],
                 )
 
-            scene_obj = cigvis.plot3D(
-                nodes,
-                return_scene=True,
-                off_screen=True,
-            )
-
-            rendered = scene_obj.get_image()
-            rendered = rendered.resize((width, height), Image.LANCZOS)
-
             if output_path is None:
-                from datetime import datetime
-
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 output_path = str(self.output_dir / f"geox_snapshot_{timestamp}.png")
 
-            rendered.save(output_path)
+            cigvis.plot3D(
+                nodes,
+                savename=output_path,
+                size=(width, height),
+                run_app=False,
+            )
+
+            rendered_path = Path(output_path)
+            if not rendered_path.exists():
+                return RenderResult(
+                    success=False,
+                    errors=["Snapshot file was not created"],
+                )
 
             return RenderResult(
                 success=True,
@@ -306,14 +361,14 @@ class CigvisAdapter(RendererAdapter):
 
             session_id = f"viser_{port}"
 
-            server = viser.create_server(host="0.0.0.0", port=port)
+            server = cigvis.viserplot.create_server(port=port)
             nodes = scene.get("nodes", [])
 
             if nodes:
-                cigvis.plot3D(
+                cigvis.viserplot.plot3D(
                     nodes,
                     server=server,
-                    return_scene=False,
+                    run_app=False,
                 )
 
             scene_id = scene.get("metadata", {}).get("title", session_id)
