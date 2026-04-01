@@ -118,7 +118,7 @@ class SurfacePrimitive:
     name: str = ""
     vertices: list[Vector3] = field(default_factory=list)
     triangles: list[tuple[int, int, int]] = field(default_factory=list)
-    color: RenderColor = field(default_factory=RenderColor)
+    color: RenderColor = field(default_factory=lambda: RenderColor())
     opacity: float = 0.7
     wireframe: bool = False
     bbox: BoundingBox | None = None
@@ -193,7 +193,7 @@ class PointSetPrimitive:
     name: str = ""
     points: list[Vector3] = field(default_factory=list)
     values: list[float] = field(default_factory=list)
-    color: RenderColor = field(default_factory=RenderColor)
+    color: RenderColor = field(default_factory=lambda: RenderColor())
     point_size: float = 5.0
     cmap: str = "viridis"
     bbox: BoundingBox | None = None
@@ -290,7 +290,7 @@ class AnnotationPrimitive:
     text: str = ""
     position: tuple[float, float] = (0.0, 0.0)
     font_size: int = 12
-    color: RenderColor = field(default_factory=RenderColor)
+    color: RenderColor = field(default_factory=lambda: RenderColor())
     bold: bool = False
     visible: bool = True
 

@@ -58,7 +58,7 @@ __all__ = [
     "WellTrajectoryPrimitive",
     "PointSetPrimitive",
     "UnitPolygonPrimitive",
-    "uncertaintyZonePrimitive",
+    "UncertaintyZonePrimitive",
     "AxisPrimitive",
     "LegendPrimitive",
     "LegendEntry",
