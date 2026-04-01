@@ -25,6 +25,8 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import math
+import os
 import socket
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +39,9 @@ from arifos.geox.renderers.base import (
 )
 
 logger = logging.getLogger("geox.renderers.cigvis")
+
+if "DISPLAY" not in os.environ:
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 CIGVIS_AVAILABLE = True
 try:
@@ -178,22 +183,17 @@ class CigvisAdapter(RendererAdapter):
             if len(vertices) == 0:
                 return []
 
-            if len(vertices) == 2:
-                import math
-
-                n1 = int(math.sqrt(len(vertices)))
-                n2 = n1
-            else:
-                n1 = int(math.sqrt(len(vertices)))
-                n2 = len(vertices) // n1 if n1 > 0 else 1
-                if n1 * n2 < len(vertices):
-                    n2 += 1
+            n1 = max(1, int(math.sqrt(len(vertices))))
+            n2 = len(vertices) // n1 if n1 > 0 else 1
+            if n1 * n2 < len(vertices):
+                n2 += 1
 
             nodes = cigvis.create_surfaces(
                 [vertices],
                 shape=(n1, n2),
                 value_type="depth",
-                cmap=surface.color.to_hex(),
+                cmap="jet",
+                color=surface.color.to_hex(),
                 shading="smooth",
             )
             return nodes
@@ -321,9 +321,15 @@ class CigvisAdapter(RendererAdapter):
 
         except Exception as e:
             logger.exception(f"Snapshot render failed: {e}")
+            errors = [str(e)]
+            if "viewport should be 1D 4-element array-like" in str(e):
+                errors.append(
+                    "Headless render failed: no usable OpenGL viewport. "
+                    "Run under Xvfb or a desktop session for snapshot E2E."
+                )
             return RenderResult(
                 success=False,
-                errors=[str(e)],
+                errors=errors,
             )
 
     def launch_interactive(
