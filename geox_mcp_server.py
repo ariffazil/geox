@@ -4,13 +4,25 @@ GEOX MCP Server Entry Point
 ═══════════════════════════════════════════════════════════════════════════════
 
 FastMCP Cloud deployment entrypoint.
-Uses 'fastmcp run' command which handles Python path correctly.
+Sets PYTHONPATH correctly for the geox package.
 
 DITEMPA BUKAN DIBERI — Forged, Not Given
-
-Usage:
-    fastmcp run geox_mcp_server.py --transport http --host 127.0.0.1 --port 8081
 """
+
+import os
+import sys
+
+# Get the parent directory (where geox/ is located)
+# geox_mcp_server.py is at /root/geox/geox_mcp_server.py
+# So parent is /root, which contains geox/ package
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(SCRIPT_DIR)
+
+# Set PYTHONPATH so 'geox' package is found
+os.environ["PYTHONPATH"] = PARENT_DIR
+
+# Now we can import the geox module
+sys.path.insert(0, PARENT_DIR)
 
 from geox.mcp.fastmcp_server import mcp
 
@@ -21,6 +33,7 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "127.0.0.1")
 
     print(f"Starting GEOX MCP Server on {host}:{port}")
+    print(f"PYTHONPATH={os.environ.get('PYTHONPATH')}")
 
     app = mcp.streamable_http_app()
     uvicorn.run(
