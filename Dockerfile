@@ -2,7 +2,7 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY . /app/geox/
+COPY . /app/
 ENV PYTHONPATH=/app
-EXPOSE 8765
-CMD ["python", "-m", "geox.geox_mcp.server"]
+EXPOSE 8081
+CMD ["python", "geox_mcp_server.py"]
