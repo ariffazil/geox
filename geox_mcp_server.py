@@ -25,9 +25,9 @@ if os.path.isdir(GEOX_PKG_PATH):
     PYTHONPATH = SCRIPT_DIR
 else:
     # geox/ package is the PARENT of geox_mcp_server.py (local dev/Docker)
-    GEOPX_ROOT = os.path.dirname(SCRIPT_DIR)
-    if os.path.isdir(os.path.join(GEOPX_ROOT, "geox")):
-        PYTHONPATH = GEOPX_ROOT
+    GEOX_ROOT = os.path.dirname(SCRIPT_DIR)
+    if os.path.isdir(os.path.join(GEOX_ROOT, "geox")):
+        PYTHONPATH = GEOX_ROOT
     else:
         PYTHONPATH = SCRIPT_DIR
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8081))
-    host = os.environ.get("HOST", "127.0.0.1")
+    host = os.environ.get("HOST", "0.0.0.0")
 
     print(f"Starting GEOX MCP Server on {host}:{port}")
     print(f"PYTHONPATH={os.environ.get('PYTHONPATH')}")
