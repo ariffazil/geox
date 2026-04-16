@@ -28,7 +28,7 @@ else:
 os.environ["PYTHONPATH"] = PYTHONPATH
 sys.path.insert(0, PYTHONPATH)
 
-from geox.mcp.fastmcp_server import mcp
+from geox.geox_mcp.fastmcp_server import mcp
 
 if __name__ == "__main__":
     import uvicorn
