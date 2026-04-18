@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://geox.arif-fazil.com/schemas/las_manifest.json",
+  "title": "LASManifest",
+  "description": "Manifest returned by geox_ingest_las — full QC and provenance record for an ingested LAS file.",
+  "type": "object",
+  "required": ["asset_id", "well_name", "uwi", "depth_range_m", "n_curves", "curves", "overall_qc_pass", "claim_tag", "vault_receipt"],
+  "properties": {
+    "asset_id": {
+      "type": "string",
+      "description": "Field/block/well identifier used as memory key."
+    },
+    "well_name": {
+      "type": "string",
+      "description": "Well name from LAS WELL header mnemonic."
+    },
+    "uwi": {
+      "type": "string",
+      "description": "Unique Well Identifier (API number or operator UWI)."
+    },
+    "kb_elevation_m": {
+      "type": ["number", "null"],
+      "description": "Kelly Bushing elevation in metres (null if not in header)."
+    },
+    "datum": {
+      "type": "string",
+      "description": "Vertical datum (e.g. MSL, KB, LAT)."
+    },
+    "crs": {
+      "type": "string",
+      "description": "Coordinate Reference System (e.g. WGS84, EPSG:32648)."
+    },
+    "depth_range_m": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[depth_top, depth_base] in metres."
+    },
+    "depth_unit": {
+      "type": "string",
+      "description": "Depth unit from LAS header (m or ft)."
+    },
+    "n_curves": {
+      "type": "integer",
+      "description": "Number of curves in the LAS file (excluding depth)."
+    },
+    "n_depth_samples": {
+      "type": "integer",
+      "description": "Number of depth samples in the file."
+    },
+    "curves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["mnemonic", "unit", "n_samples", "null_pct", "qc_pass", "qc_flags"],
+        "properties": {
+          "mnemonic": { "type": "string" },
+          "unit": { "type": "string" },
+          "n_samples": { "type": "integer" },
+          "null_pct": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "range_min": { "type": "number" },
+          "range_max": { "type": "number" },
+          "out_of_bounds_pct": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "spike_count": { "type": "integer", "minimum": 0 },
+          "qc_pass": { "type": "boolean" },
+          "qc_flags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "overall_qc_pass": {
+      "type": "boolean",
+      "description": "True if all curves pass QC."
+    },
+    "claim_tag": {
+      "type": "string",
+      "enum": ["CLAIM", "PLAUSIBLE", "HYPOTHESIS", "ESTIMATE", "UNKNOWN"],
+      "description": "Epistemic classification per ClaimTag enum."
+    },
+    "vault_receipt": {
+      "type": "object",
+      "description": "VAULT999 governance receipt.",
+      "required": ["epoch", "session_id", "hash", "timestamp"],
+      "properties": {
+        "epoch": { "type": "integer" },
+        "session_id": { "type": "string" },
+        "hash": { "type": "string" },
+        "overall_qc_pass": { "type": "boolean" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "audit_trace": {
+      "type": "string",
+      "description": "Human-readable audit trace string."
+    }
+  }
+}

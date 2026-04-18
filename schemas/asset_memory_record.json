@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://geox.arif-fazil.com/schemas/asset_memory_record.json",
+  "title": "AssetMemoryRecord",
+  "description": "Single record stored in the GEOX per-asset cross-domain memory (SQLite store).",
+  "type": "object",
+  "required": ["record_id", "asset_id", "eval_type", "timestamp", "payload", "vault_receipt"],
+  "properties": {
+    "record_id": {
+      "type": "integer",
+      "description": "Auto-incremented SQLite primary key."
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "Field/block/well identifier (memory partition key)."
+    },
+    "eval_type": {
+      "type": "string",
+      "description": "Evaluation category, e.g. 'petro_ensemble', 'volumetrics', 'basin_charge', 'sensitivity', 'las_ingest'.",
+      "examples": ["petro_ensemble", "volumetrics", "basin_charge", "sensitivity", "las_ingest"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of the store operation."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Arbitrary JSON payload containing the evaluation result.",
+      "additionalProperties": true
+    },
+    "vault_receipt": {
+      "type": "object",
+      "description": "VAULT999 governance receipt attached at store time.",
+      "required": ["epoch", "session_id", "hash", "timestamp"],
+      "properties": {
+        "epoch": { "type": "integer" },
+        "session_id": { "type": "string" },
+        "hash": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

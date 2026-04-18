@@ -240,7 +240,132 @@ class ToolRegistry:
     @classmethod
     def list_tools(cls) -> list[ToolMetadata]:
         return list(cls._tools.values())
-    
+
+    @classmethod
+    def register(cls, metadata: ToolMetadata) -> None:
+        """Register a tool by metadata object."""
+        cls._tools[metadata.name] = metadata
+
     # Maintain compatibility with geox/__init__.py
     ToolStatus = ToolStatus
     ErrorCode = ErrorCode
+
+
+# ============================================================================
+# WAVE 2 TOOL REGISTRATIONS
+# ============================================================================
+
+_WAVE2_TOOLS: list[ToolMetadata] = [
+    ToolMetadata(
+        name="geox_compute_sw_ensemble",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Compute Sw using Archie + Indonesia + Simandoux simultaneously. Returns P10/P50/P90 band.",
+        dimension="petrophysics",
+        metabolic_stage="777",
+        nature=["probabilistic", "ensemble", "physics-first"],
+        ac_risk_enabled=True,
+        required_floors=["F1", "F2"],
+        error_codes=[ErrorCode.PHYSICS_VIOLATION, ErrorCode.CALCULATION_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_compute_volume_probabilistic",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Monte Carlo HCPV/STOIIP via N=10,000 draws. Returns P10/P50/P90 + tornado chart.",
+        dimension="volumetrics",
+        metabolic_stage="777",
+        nature=["probabilistic", "monte-carlo", "physics-first"],
+        ac_risk_enabled=True,
+        required_floors=["F1", "F2"],
+        error_codes=[ErrorCode.PHYSICS_VIOLATION, ErrorCode.CALCULATION_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_simulate_basin_charge",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Basin charge simulation: TTI (Lopatin) + Easy%Ro (Sweeney-Burnham) + Darcy migration.",
+        dimension="basin-charge",
+        metabolic_stage="333",
+        nature=["kinetics", "migration", "physics-first"],
+        ac_risk_enabled=True,
+        required_floors=["F1", "F2"],
+        error_codes=[ErrorCode.PHYSICS_VIOLATION, ErrorCode.CALCULATION_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_run_sensitivity_sweep",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="OAT sensitivity sweep ±20% on AC_Risk inputs. SI ranking + verdict demotion if critical.",
+        dimension="audit",
+        metabolic_stage="888",
+        nature=["sensitivity", "oat", "tornado"],
+        ac_risk_enabled=False,
+        required_floors=["F2"],
+        error_codes=[ErrorCode.CALCULATION_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_ingest_las",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Parse LAS 2.0/3.0 file. Returns LASManifest with curve QC flags and VAULT999 receipt.",
+        dimension="well",
+        metabolic_stage="000",
+        nature=["ingest", "qc", "las"],
+        ac_risk_enabled=False,
+        required_floors=["F2"],
+        error_codes=[ErrorCode.FILE_NOT_FOUND, ErrorCode.INVALID_FORMAT],
+    ),
+    ToolMetadata(
+        name="geox_memory_store_asset",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Store evaluation result in per-asset SQLite memory. F11 auth required (amanah_locked=True).",
+        dimension="memory",
+        metabolic_stage="999",
+        nature=["persistence", "learning", "f11-guarded"],
+        ac_risk_enabled=False,
+        required_floors=["F11"],
+        error_codes=[ErrorCode.GOVERNANCE_HOLD, ErrorCode.INTERNAL_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_memory_recall_asset",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Recall stored evaluations for an asset from SQLite memory. F2 truth-tagged.",
+        dimension="memory",
+        metabolic_stage="333",
+        nature=["recall", "learning", "f2-tagged"],
+        ac_risk_enabled=False,
+        required_floors=["F2"],
+        error_codes=[ErrorCode.DATA_UNAVAILABLE],
+    ),
+    ToolMetadata(
+        name="geox_render_log_track",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Prepare log track render payload (GR/RHOB/NPHI/RT) for WebGL canvas. VAULT999 tagged.",
+        dimension="visualization",
+        metabolic_stage="333",
+        nature=["visualization", "webgl", "log-track"],
+        ac_risk_enabled=False,
+        required_floors=["F2"],
+        error_codes=[ErrorCode.CALCULATION_ERROR],
+    ),
+    ToolMetadata(
+        name="geox_render_volume_slice",
+        version="1.0.0",
+        status=ToolStatus.PROD,
+        description="Prepare 2D seismic/attribute volume slice render payload for WebGL canvas. VAULT999 tagged.",
+        dimension="visualization",
+        metabolic_stage="333",
+        nature=["visualization", "webgl", "volume-slice"],
+        ac_risk_enabled=False,
+        required_floors=["F2"],
+        error_codes=[ErrorCode.CALCULATION_ERROR],
+    ),
+]
+
+# Register all Wave 2 tools on module load
+for _tool in _WAVE2_TOOLS:
+    ToolRegistry.register(_tool)
