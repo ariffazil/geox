@@ -127,11 +127,7 @@ def register_unified_tools(mcp: FastMCP, profile: str = "full") -> None:
             alias_func.__doc__ = f"Legacy Alias for {n} (Deprecated)."
             return alias_func
 
-        mcp.tool(
-            name=old_name,
-            description=f"[DEPRECATED] Alias for {new_name}. Update calling contract by 2026-06-01.",
-            annotations={"deprecated": True, "canonical_name": new_name},
-        )(make_alias())
+        mcp.tool(name=old_name)(make_alias())
 
     # ── Well correlation tools (non-canonical, kept for compatibility) ───────
     from contracts.tools.well_correlation import register_well_correlation_tools

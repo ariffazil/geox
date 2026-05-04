@@ -38,7 +38,7 @@ SMOKE_LAS = str(Path(__file__).parent / "fixtures" / "geox_smoke_test.las")
 
 def _reset_registry():
     """Clear the in-memory artifact registry between tests."""
-    from contracts.tools.canonical._helpers import _artifact_registry, _well_curves_registry, _artifact_store
+    from contracts.tools.unified_13 import _artifact_registry, _well_curves_registry, _artifact_store
     _artifact_registry.clear()
     _well_curves_registry.clear()
     _artifact_store.clear()
@@ -58,8 +58,7 @@ def test_A_local_las_ingest_succeeds(tmp_path):
 
     # Wire up a minimal FastMCP so register_unified_tools can register tools
     from fastmcp import FastMCP
-    from contracts.tools.canonical._helpers import _artifact_exists
-    from contracts.tools.unified_13 import register_unified_tools
+    from contracts.tools.unified_13 import register_unified_tools, _artifact_exists
 
     mcp = FastMCP(name="test_geox")
     register_unified_tools(mcp)
@@ -72,16 +71,12 @@ def test_A_local_las_ingest_succeeds(tmp_path):
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
+    
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
-    # Engine may return a nested dict in content[0].text
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
-
-    # Accept both direct dict and nested wrapper
-    status = data.get("status") or data.get("execution_status", "")
-    assert status != "ERROR", f"Expected success, got ERROR: {data}"
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected success, got {result.execution_status}: {result.content}"
     # Artifact must be registered
     derived_id = Path(SMOKE_LAS).stem
     assert _artifact_exists(derived_id), f"Expected '{derived_id}' in registry after ingest"
@@ -101,8 +96,7 @@ def test_B_url_las_fetch_mocked_succeeds(tmp_path):
         shutil.copyfile(SMOKE_LAS, dest)
 
     from fastmcp import FastMCP
-    from contracts.tools.canonical._helpers import _artifact_exists
-    from contracts.tools.unified_13 import register_unified_tools
+    from contracts.tools.unified_13 import register_unified_tools, _artifact_exists
 
     mcp = FastMCP(name="test_geox_url")
     register_unified_tools(mcp)
@@ -117,13 +111,11 @@ def test_B_url_las_fetch_mocked_succeeds(tmp_path):
 
         result = _run(run())
 
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
-    status = data.get("status") or data.get("execution_status", "")
-    assert status != "ERROR", f"Expected success from URL ingest, got ERROR: {data}"
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected success from URL ingest, got {result.execution_status}: {result.content}"
     assert _artifact_exists("FAKE_WELL_URL"), "Artifact 'FAKE_WELL_URL' should be registered after URL ingest"
 
 
@@ -146,16 +138,15 @@ def test_C_missing_file_returns_file_not_found():
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     assert data.get("error_code") == "FILE_NOT_FOUND", (
         f"Expected FILE_NOT_FOUND, got: {data}"
     )
-    status = data.get("status") or data.get("execution_status", "")
-    assert status == "ERROR", f"Expected status ERROR for missing file, got: {status}"
+    assert result.execution_status == ExecutionStatus.ERROR, f"Expected status ERROR for missing file, got: {result.execution_status}"
 
 
 # ─── Test D: Bad URL returns URL_FETCH_FAILED ────────────────────────────────
@@ -184,14 +175,14 @@ def test_D_bad_url_returns_url_fetch_failed():
 
         result = _run(run())
 
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     assert data.get("error_code") == "URL_FETCH_FAILED", (
         f"Expected URL_FETCH_FAILED, got: {data}"
     )
+    assert result.execution_status == ExecutionStatus.ERROR, f"Expected status ERROR for bad URL, got: {result.execution_status}"
 
 
 # ─── Test E: QC fails closed for unregistered artifact_ref (Bug 3) ───────────
@@ -215,17 +206,21 @@ def test_E_qc_fails_closed_for_unregistered_ref():
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     assert data.get("error_code") == "ARTIFACT_NOT_FOUND", (
         f"BUG3 REGRESSION: unregistered ref should fail closed, got: {data}"
     )
-    exec_status = data.get("execution_status") or data.get("status", "")
-    assert exec_status == "ERROR", (
-        f"BUG3 REGRESSION: expected ERROR status, got: {exec_status}"
+    assert result.execution_status == ExecutionStatus.ERROR, (
+        f"BUG3 REGRESSION: expected ERROR status, got: {result.execution_status}"
+    )
+    assert result.governance_status == GovernanceStatus.HOLD, (
+        f"Expected HOLD governance status, got: {result.governance_status}"
+    )
+    assert result.artifact_status == ArtifactStatus.REJECTED, (
+        f"Expected REJECTED artifact status, got: {result.artifact_status}"
     )
     assert data.get("claim_state") == "NO_VALID_EVIDENCE", (
         f"Expected NO_VALID_EVIDENCE, got: {data.get('claim_state')}"
@@ -240,8 +235,7 @@ def test_F_qc_passes_for_registered_ref():
     _reset_registry()
 
     from fastmcp import FastMCP
-    from contracts.tools.canonical._helpers import _register_artifact
-    from contracts.tools.unified_13 import register_unified_tools
+    from contracts.tools.unified_13 import register_unified_tools, _register_artifact
 
     mcp = FastMCP(name="test_geox_qc_f")
     register_unified_tools(mcp)
@@ -256,18 +250,22 @@ def test_F_qc_passes_for_registered_ref():
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     # Must NOT return ARTIFACT_NOT_FOUND
     assert data.get("error_code") != "ARTIFACT_NOT_FOUND", (
         f"Registered artifact should not return ARTIFACT_NOT_FOUND: {data}"
     )
-    exec_status = data.get("execution_status") or data.get("status", "")
-    assert exec_status != "ERROR", (
-        f"Registered artifact QC should succeed, got ERROR: {data}"
+    assert result.execution_status == ExecutionStatus.SUCCESS, (
+        f"Registered artifact QC should succeed, got ERROR: {result.execution_status}"
+    )
+    assert result.governance_status == GovernanceStatus.SEAL, (
+        f"Expected SEAL governance status, got: {result.governance_status}"
+    )
+    assert result.artifact_status == ArtifactStatus.VERIFIED, (
+        f"Expected VERIFIED artifact status, got: {result.artifact_status}"
     )
 
 
@@ -293,17 +291,21 @@ def test_G_candidates_fail_closed_for_unregistered_refs():
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     assert data.get("error_code") == "EVIDENCE_REF_NOT_FOUND", (
         f"BUG4 REGRESSION: unregistered evidence_refs should fail closed, got: {data}"
     )
-    exec_status = data.get("execution_status") or data.get("status", "")
-    assert exec_status == "ERROR", (
-        f"BUG4 REGRESSION: expected ERROR, got: {exec_status}"
+    assert result.execution_status == ExecutionStatus.ERROR, (
+        f"BUG4 REGRESSION: expected ERROR, got: {result.execution_status}"
+    )
+    assert result.governance_status == GovernanceStatus.HOLD, (
+        f"Expected HOLD governance status, got: {result.governance_status}"
+    )
+    assert result.artifact_status == ArtifactStatus.NOT_COMPUTED, (
+        f"Expected NOT_COMPUTED artifact status, got: {result.artifact_status}"
     )
     assert data.get("claim_state") == "NO_VALID_EVIDENCE", (
         f"Expected NO_VALID_EVIDENCE, got: {data.get('claim_state')}"
@@ -355,8 +357,7 @@ def test_I_petrophysics_computation_succeeds():
     _reset_registry()
 
     from fastmcp import FastMCP
-    from contracts.tools.canonical._helpers import _register_artifact
-    from contracts.tools.unified_13 import register_unified_tools
+    from contracts.tools.unified_13 import register_unified_tools, _register_artifact
 
     mcp = FastMCP(name="test_geox_petro")
     register_unified_tools(mcp)
@@ -373,13 +374,14 @@ def test_I_petrophysics_computation_succeeds():
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text) if hasattr(result.content[0], "text") else result
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     # This should fail if there are import errors or if target_class=petrophysics isn't wired yet.
-    assert data.get("execution_status") == "SUCCESS", f"Expected SUCCESS, got: {data}"
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected SUCCESS, got: {result.execution_status}"
+    assert result.governance_status == GovernanceStatus.SEAL, f"Expected SEAL, got: {result.governance_status}"
+    assert result.artifact_status == ArtifactStatus.COMPUTED, f"Expected COMPUTED, got: {result.artifact_status}"
     assert "p50" in data or "sw_mean" in data, f"Expected Sw results in output, got: {data}"
 
 
@@ -394,38 +396,42 @@ def test_J_ingest_qc_candidate_preserve_artifact_ref():
     register_unified_tools(mcp)
 
     async def run():
-        ingest = await mcp.call_tool("geox_data_ingest_bundle", {
+        ingest_result = await mcp.call_tool("geox_data_ingest_bundle", {
             "source_uri": SMOKE_LAS,
             "source_type": "well",
             "well_id": "FLOW_WELL",
         })
-        import json
-        ingest_data = json.loads(ingest.content[0].text)
-        if isinstance(ingest_data, dict) and "data" in ingest_data:
-            ingest_data = ingest_data["data"]
+        # Extract primary_artifact from the envelope
+        ingest_data = ingest_result.primary_artifact
+        assert ingest_data is not None, "Ingest primary artifact should not be None"
 
         artifact_ref = ingest_data.get("artifact_ref")
-        qc = await mcp.call_tool("geox_data_qc_bundle", {
+        qc_result = await mcp.call_tool("geox_data_qc_bundle", {
             "artifact_ref": artifact_ref,
             "artifact_type": "well_log",
         })
-        cand = await mcp.call_tool("geox_subsurface_generate_candidates", {
+        qc_data = qc_result.primary_artifact
+        assert qc_data is not None, "QC primary artifact should not be None"
+
+        cand_result = await mcp.call_tool("geox_subsurface_generate_candidates", {
             "target_class": "petrophysics",
             "evidence_refs": [artifact_ref],
             "realizations": 3,
         })
-        return ingest_data, json.loads(qc.content[0].text), json.loads(cand.content[0].text)
+        cand_data = cand_result.primary_artifact
+        assert cand_data is not None, "Candidate primary artifact should not be None"
 
-    ingest_data, qc_data, cand_data = _run(run())
-    if isinstance(qc_data, dict) and "data" in qc_data:
-        qc_data = qc_data["data"]
-    if isinstance(cand_data, dict) and "data" in cand_data:
-        cand_data = cand_data["data"]
+        return ingest_result, qc_result, cand_result # Return ToolResult objects
+
+    ingest_result, qc_result, cand_result = _run(run())
+    ingest_data = ingest_result.primary_artifact
+    qc_data = qc_result.primary_artifact
+    cand_data = cand_result.primary_artifact
 
     assert ingest_data.get("artifact_ref") == "FLOW_WELL"
     assert qc_data.get("artifact_ref") == "FLOW_WELL"
-    assert qc_data.get("error_code") != "ARTIFACT_NOT_FOUND", qc_data
-    assert cand_data.get("error_code") != "EVIDENCE_REF_NOT_FOUND", cand_data
+    assert qc_result.execution_status == ExecutionStatus.SUCCESS, f"Expected QC success, got {qc_result.execution_status}: {qc_result.content}"
+    assert cand_result.execution_status == ExecutionStatus.SUCCESS, f"Expected candidate generation success, got {cand_result.execution_status}: {cand_result.content}"
     assert cand_data.get("artifact_ref") == "FLOW_WELL"
 
 
@@ -464,57 +470,54 @@ def test_J2_candidate_holds_when_latest_qc_failed():
         })
 
     result = _run(run())
-    data = json.loads(result.content[0].text)
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     entry = _get_artifact("QC_FAIL_WELL")
     assert entry["latest_qc"]["qc_passed"] is False
-    assert data.get("execution_status") == "HOLD", data
+    assert result.execution_status == ExecutionStatus.HOLD, f"Expected HOLD, got {result.execution_status}: {result.content}"
     assert data.get("error_code") == "QC_FAILED_HUMAN_REVIEW_REQUIRED", data
-    assert data.get("claim_state") == "HUMAN_REVIEW_REQUIRED", data
+    assert result.claim_tag == "HUMAN_REVIEW_REQUIRED", f"Expected HUMAN_REVIEW_REQUIRED claim_tag, got {result.claim_tag}"
     assert data.get("requires_human_review") is True
     assert data.get("artifact_ref") == "QC_FAIL_WELL"
 
 
-def test_J3_file_upload_import_makes_las_server_visible():
-    """Base64 LAS upload should write /data-visible evidence and register artifact_ref."""
+def test_J3_file_upload_via_ingest_bundle_makes_las_server_visible():
+    """Base64 LAS upload via geox_data_ingest_bundle should write /data-visible evidence and register artifact_ref."""
     _reset_registry()
 
     from fastmcp import FastMCP
-    from contracts.tools.unified_13 import register_unified_tools
+    from contracts.tools.unified_13 import register_unified_tools, _artifact_exists
+    from contracts.enums.statuses import ExecutionStatus
 
     payload = base64.b64encode(Path(SMOKE_LAS).read_bytes()).decode("ascii")
-    mcp = FastMCP(name="test_geox_file_upload_import")
+    mcp = FastMCP(name="test_geox_ingest_upload")
     register_unified_tools(mcp)
 
     async def run():
-        imported = await mcp.call_tool("geox_file_upload_import", {
+        imported = await mcp.call_tool("geox_data_ingest_bundle", {
             "filename": "UPLOAD_SMOKE.las",
             "content_base64": payload,
             "target_dir": "/data/geox_las_pytest",
             "well_id": "UPLOAD_SMOKE",
             "overwrite": True,
         })
-        import_data = json.loads(imported.content[0].text)
+        # The result is now an MCP envelope, not just raw data
+        return imported
 
-        inventory = await mcp.call_tool("geox_las_curve_inventory", {
-            "las_path": import_data["stored_path"],
-            "well_id": "UPLOAD_SMOKE",
-        })
-        return import_data, json.loads(inventory.content[0].text)
+    result = _run(run())
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected success, got {result.execution_status}: {result.content}"
+    
+    # Extract primary_artifact from the envelope
+    import_data = result.primary_artifact
+    assert import_data is not None, "Primary artifact should not be None"
 
-    import_data, inventory_data = _run(run())
-    if isinstance(import_data, dict) and "data" in import_data:
-        import_data = import_data["data"]
-    if isinstance(inventory_data, dict) and "data" in inventory_data:
-        inventory_data = inventory_data["data"]
+    assert import_data.get("status") == "OK", import_data
+    assert import_data.get("artifact_ref") == "well_las:UPLOAD_SMOKE", import_data
+    assert _artifact_exists("UPLOAD_SMOKE"), "Artifact 'UPLOAD_SMOKE' should be registered after ingest bundle upload"
+    assert Path(import_data.get("stored_path", "")).exists(), f"Expected stored path to exist: {import_data.get("stored_path")}"
 
-    assert import_data["status"] == "OK", import_data
-    assert import_data["artifact_ref"] == "well_las:UPLOAD_SMOKE"
-    assert Path(import_data["stored_path"]).exists()
-    assert inventory_data["ok"] is True, inventory_data
-    assert inventory_data["well_id"] == "UPLOAD_SMOKE"
 
 
 def test_K_correlation_panel_accepts_output_png(tmp_path):
@@ -538,12 +541,11 @@ def test_K_correlation_panel_accepts_output_png(tmp_path):
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text)
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
-    assert data.get("ok") is True, data
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected success, but got {result.execution_status}: {result.content}"
     assert data.get("artifact", {}).get("png_path") == str(output_png)
     assert output_png.exists(), f"Expected requested output_png to exist: {output_png}"
 
@@ -589,13 +591,12 @@ def test_M_correlation_panel_outputs_svg_pdf_json_audit(tmp_path):
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text)
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
     artifact = data.get("artifact", {})
-    assert data.get("ok") is True, data
+    assert result.execution_status == ExecutionStatus.SUCCESS, f"Expected success, but got {result.execution_status}: {result.content}"
     assert artifact.get("png_path") == str(output_png)
     assert artifact.get("svg_path") == str(output_png.with_suffix(".svg"))
     assert artifact.get("pdf_path") == str(output_png.with_suffix(".pdf"))
@@ -628,11 +629,10 @@ def test_N_plotspec_rejects_arbitrary_code_field(tmp_path):
         })
 
     result = _run(run())
-    import json
-    data = json.loads(result.content[0].text)
-    if isinstance(data, dict) and "data" in data:
-        data = data["data"]
+    # Extract primary_artifact from the envelope
+    data = result.primary_artifact
+    assert data is not None, "Primary artifact should not be None"
 
-    assert data.get("ok") is False
+    assert result.execution_status == ExecutionStatus.ERROR, f"Expected ERROR, but got {result.execution_status}: {result.content}"
     assert data.get("error_code") == "PLOTSPEC_REJECTED"
     assert "Executable PlotSpec field rejected" in data.get("error_message", "")
