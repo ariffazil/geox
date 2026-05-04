@@ -62,10 +62,12 @@ def register_section_tools(mcp: FastMCP, profile: str = "full"):
             "seal": "DITEMPA_BUKAN_DIBERI"
         }
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.QUALIFY, 
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://attribute-audit"
         )
 

@@ -157,10 +157,12 @@ def register_earth3d_tools(mcp: FastMCP, profile: str = "full"):
             "physics_guard": "Physics9 Boundary Check Passed"
         }
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.SEAL, 
-            artifact_status=ArtifactStatus.VERIFIED, 
-            uncertainty="Low",
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            uncertainty="High",
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://earth3d-dashboard"
         )

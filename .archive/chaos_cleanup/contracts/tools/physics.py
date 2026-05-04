@@ -66,12 +66,14 @@ def register_physics_tools(mcp: FastMCP, profile: str = "full"):
     @mcp.tool(name="geox_physics_validate_operation")
     async def geox_physics_validate_operation(operation_ref: str) -> dict:
         """Verify: Check if current operation adheres to safety and physical bounds."""
-        artifact = {"operation_ref": operation_ref, "status": "validated", "seal": "F9_PHYSICS_9"}
+        artifact = {"operation_ref": operation_ref, "status": "screened", "seal": "F9_PHYSICS_9"}
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.SEAL, 
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://physics-dashboard"
         )
 
@@ -80,10 +82,12 @@ def register_physics_tools(mcp: FastMCP, profile: str = "full"):
         """Audit: Investigate if any 888_HOLD conditions were bypassed."""
         artifact = {"session_ref": session_ref, "breach_detected": False}
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.QUALIFY, 
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://physics-dashboard"
         )
 
@@ -92,10 +96,12 @@ def register_physics_tools(mcp: FastMCP, profile: str = "full"):
         """Verify: Check physical parameters for consistency (e.g. Gardner density)."""
         artifact = {"consistent": True, "method": "Gardner"}
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.QUALIFY, 
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://physics-dashboard"
         )
 
@@ -199,10 +205,10 @@ def register_physics_tools(mcp: FastMCP, profile: str = "full"):
             """Register an agent with the Agent Control Plane."""
             artifact = await acp_register_agent(agent_ref, role, name, resources, tools)
             return get_standard_envelope(
-                artifact, 
-                tool_class="govern", 
-                governance_status=GovernanceStatus.QUALIFY, 
-                artifact_status=ArtifactStatus.VERIFIED,
+                artifact,
+                tool_class="govern",
+                governance_status=GovernanceStatus.QUALIFY,
+                artifact_status=ArtifactStatus.STAGED,
                 ui_resource_uri="ui://physics-dashboard"
             )
 
@@ -235,10 +241,10 @@ def register_physics_tools(mcp: FastMCP, profile: str = "full"):
             """Grant 999_SEAL (sovereign human authority)."""
             artifact = await acp_grant_seal(proposal_ref, human_auth_token)
             return get_standard_envelope(
-                artifact, 
-                tool_class="govern", 
-                governance_status=GovernanceStatus.SEAL, 
-                artifact_status=ArtifactStatus.VERIFIED,
+                artifact,
+                tool_class="govern",
+                governance_status=GovernanceStatus.SEAL,
+                artifact_status=ArtifactStatus.SEAL,
                 ui_resource_uri="ui://physics-dashboard"
             )
 

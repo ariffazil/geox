@@ -73,7 +73,9 @@ def register_cross_tools(mcp: FastMCP, profile: str = "full"):
             artifact,
             tool_class="observe",
             governance_status=GovernanceStatus.QUALIFY,
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://cross-dashboard"
         )
 
@@ -111,7 +113,9 @@ def register_cross_tools(mcp: FastMCP, profile: str = "full"):
             artifact,
             tool_class="observe",
             governance_status=GovernanceStatus.QUALIFY,
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://cross-dashboard"
         )
 
@@ -132,7 +136,9 @@ def register_cross_tools(mcp: FastMCP, profile: str = "full"):
             artifact,
             tool_class="observe",
             governance_status=GovernanceStatus.QUALIFY,
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://cross-dashboard"
         )
 

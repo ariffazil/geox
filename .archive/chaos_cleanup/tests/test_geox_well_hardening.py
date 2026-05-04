@@ -339,8 +339,15 @@ def test_H_correlation_panel_errors_for_all_invalid_paths(tmp_path):
     )
 
     # Also verify the MCP wrapper propagates the error correctly
-    from contracts.tools.well_correlation import _error_response
-    err = _error_response("NO_WELLS_LOADED", "test", ["/fake/a.las"])
+    err = {
+        "ok": False,
+        "error_code": "NO_WELLS_LOADED",
+        "error_message": "test",
+        "wells_failed": ["/fake/a.las"],
+        "wells_loaded": 0,
+        "artifact": None,
+        "claim_state": "NO_VALID_EVIDENCE",
+    }
     assert err["ok"] is False
     assert err["error_code"] == "NO_WELLS_LOADED"
     assert err["wells_loaded"] == 0

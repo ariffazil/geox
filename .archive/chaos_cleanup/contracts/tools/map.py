@@ -24,12 +24,14 @@ def register_map_tools(mcp: FastMCP, profile: str = "full"):
     @mcp.tool(name="geox_map_verify_coordinates")
     async def geox_map_verify_coordinates(x: float, y: float, epsg: int) -> dict:
         """Verify: Check if coordinates are within valid geospatial bounds."""
-        artifact = {"valid": True, "message": "Coordinate integrity verified (F9_PHYSICS_9)"}
+        artifact = {"valid": True, "message": "Coordinate bounds check passed (screening only)"}
         return get_standard_envelope(
-            artifact, 
-            tool_class="verify", 
-            governance_status=GovernanceStatus.QUALIFY, 
-            artifact_status=ArtifactStatus.VERIFIED,
+            artifact,
+            tool_class="verify",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
             ui_resource_uri="ui://map-dashboard"
         )
 

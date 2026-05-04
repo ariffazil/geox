@@ -17,14 +17,16 @@ def register_prospect_tools(mcp: FastMCP, profile: str = "full"):
     @mcp.tool(name="geox_prospect_evaluate")
     async def geox_prospect_evaluate(prospect_ref: str) -> dict:
         """Judge: Evaluate hydrocarbon potential based on 888_JUDGE verdict."""
-        artifact = {"prospect_ref": prospect_ref, "score": 0.88, "status": "Highly Prospective (F9 Checked)"}
+        artifact = {"prospect_ref": prospect_ref, "score": None, "status": "HYPOTHESIS — no evidence evaluated"}
         return get_standard_envelope(
-            artifact, 
-            tool_class="judge", 
-            governance_status=GovernanceStatus.SEAL, 
-            artifact_status=ArtifactStatus.VERIFIED, 
-            uncertainty="Low", 
-            evidence_refs=["ratlas://play-fairway", "acp://verdict"],
+            artifact,
+            tool_class="judge",
+            governance_status=GovernanceStatus.QUALIFY,
+            artifact_status=ArtifactStatus.DRAFT,
+            uncertainty="High",
+            claim_tag="HYPOTHESIS",
+            claim_state="NO_VALID_EVIDENCE",
+            evidence_refs=[],
             ui_resource_uri="ui://prospect-dashboard"
         )
 
